@@ -1,0 +1,148 @@
+#!/usr/bin/env python3
+"""Update both formulae to the latest compatible upstream GitHub release."""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import re
+import sys
+import urllib.error
+import urllib.request
+from dataclasses import dataclass
+from pathlib import Path
+
+API_URL = "https://api.github.com/repos/Eltirosto/Degrees-of-Lewdity-Chinese-Localization/releases/latest"
+RELEASE_BASE = "https://github.com/Eltirosto/Degrees-of-Lewdity-Chinese-Localization/releases/download"
+ROOT = Path(__file__).resolve().parent.parent
+FORMULAE = (ROOT / "Formula" / "dol-chs.rb", ROOT / "Formula" / "dol-chs-mod.rb")
+TAG_PATTERN = re.compile(r"^v(?P<version>\d+(?:\.\d+)+-chs-\d+(?:\.\d+)+[abr])$")
+
+
+@dataclass(frozen=True)
+class Asset:
+    name: str
+    url: str
+    sha256: str
+
+
+@dataclass(frozen=True)
+class Release:
+    tag: str
+    version: str
+    game: Asset
+    i18n: Asset
+    images: Asset
+
+
+def asset_sha256(asset: dict) -> str:
+    digest = asset.get("digest")
+    if isinstance(digest, str) and digest.startswith("sha256:"):
+        return digest.removeprefix("sha256:")
+
+    request = urllib.request.Request(asset["browser_download_url"], headers={"User-Agent": "homebrew-dol-updater"})
+    checksum = hashlib.sha256()
+    with urllib.request.urlopen(request) as response:
+        while chunk := response.read(1024 * 1024):
+            checksum.update(chunk)
+    return checksum.hexdigest()
+
+
+def parse_release(payload: dict) -> Release:
+    tag = payload.get("tag_name", "")
+    match = TAG_PATTERN.fullmatch(tag)
+    if not match:
+        raise ValueError(f"unsupported release tag: {tag!r}")
+    version = match.group("version")
+    game_version = version.split("-chs-", 1)[0]
+
+    assets = {asset["name"]: asset for asset in payload.get("assets", [])}
+    game_pattern = re.compile(rf"^DoL-ModLoader-{re.escape(game_version)}-v[^/]+\.zip$")
+    game_names = [name for name in assets if game_pattern.fullmatch(name) and "polyfill" not in name]
+    i18n_name = f"ModI18N-{version}.mod.zip"
+    images_name = f"GameOriginalImagePack-{game_version}.mod.zip"
+    if len(game_names) != 1 or i18n_name not in assets or images_name not in assets:
+        raise ValueError(f"release {tag} does not contain one compatible game, i18n, and image asset set")
+
+    def convert(name: str) -> Asset:
+        source = assets[name]
+        return Asset(name, source["browser_download_url"], asset_sha256(source))
+
+    return Release(tag, version, convert(game_names[0]), convert(i18n_name), convert(images_name))
+
+
+def fetch_latest_release() -> Release:
+    request = urllib.request.Request(API_URL, headers={
+        "Accept": "application/vnd.github+json",
+        "User-Agent": "homebrew-dol-updater",
+    })
+    with urllib.request.urlopen(request) as response:
+        return parse_release(json.load(response))
+
+
+def update_formula(content: str, release: Release) -> str:
+    stable_pattern = re.compile(
+        r'^  url "[^"]+/DoL-ModLoader-[^"]+\.zip"\n'
+        r'^  version "[^"]+"\n'
+        r'^  sha256 "[0-9a-f]{64}"',
+        re.MULTILINE,
+    )
+    stable = (
+        f'  url "{release.game.url}"\n'
+        f'  version "{release.version}"\n'
+        f'  sha256 "{release.game.sha256}"'
+    )
+    content, stable_count = stable_pattern.subn(stable, content, count=1)
+    if stable_count != 1:
+        raise ValueError("could not update stable URL/version/checksum")
+
+    for resource_name, asset in (("official-i18n", release.i18n), ("official-images", release.images)):
+        resource_pattern = re.compile(
+            rf'(  resource "{resource_name}" do\n'
+            rf'    url ")[^"]+("[,]?\n'
+            rf'        using: :nounzip\n'
+            rf'    sha256 ")[0-9a-f]{{64}}(")'
+        )
+        replacement = rf'\g<1>{asset.url}\g<2>{asset.sha256}\g<3>'
+        content, resource_count = resource_pattern.subn(replacement, content, count=1)
+        if resource_count != 1:
+            raise ValueError(f"could not update {resource_name} resource")
+    return content
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--check", action="store_true", help="report whether an update is needed without writing")
+    args = parser.parse_args(argv)
+    release = fetch_latest_release()
+    changed = []
+    updates = {}
+    for formula in FORMULAE:
+        original = formula.read_text(encoding="utf-8")
+        updated = update_formula(original, release)
+        updates[formula] = updated
+        if updated != original:
+            changed.append(formula)
+
+    if args.check:
+        if changed:
+            print(f"Update available: {release.version}")
+            return 1
+        print(f"Formulae are current: {release.version}")
+        return 0
+
+    for formula in changed:
+        formula.write_text(updates[formula], encoding="utf-8")
+        print(f"Updated {formula.relative_to(ROOT)} to {release.version}")
+    if not changed:
+        print(f"Formulae are already current: {release.version}")
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        raise SystemExit(main())
+    except (OSError, ValueError, urllib.error.URLError) as error:
+        print(f"update-release: {error}", file=sys.stderr)
+        raise SystemExit(1) from error
