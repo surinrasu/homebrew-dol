@@ -1,0 +1,53 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions: {}
+
+defaults:
+  run:
+    shell: bash -xeuo pipefail {0}
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - macos-26
+          - macos-26-intel
+          - ubuntu-24.04
+          - ubuntu-24.04-arm
+    runs-on: ${{ matrix.os }}
+    permissions:
+      actions: read
+      checks: read
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Homebrew
+        id: set-up-homebrew
+        uses: Homebrew/actions/setup-homebrew@a657b8b0cd35d0f65cce41fce9b24cf054b49869 # 2026.08.24.1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Test Python code
+        run: python3 -m unittest discover -s test -v
+
+      - name: Check tap syntax
+        env:
+          TAP_NAME: ${{ steps.set-up-homebrew.outputs.tap-name }}
+        run: brew test-bot --only-tap-syntax --tap="$TAP_NAME"
+
+      - name: Audit, install, and test formulae
+        env:
+          TAP_NAME: ${{ steps.set-up-homebrew.outputs.tap-name }}
+        run: |
+          brew audit --strict "$TAP_NAME/dol-chs" "$TAP_NAME/dol-chs-mod"
+          brew install --build-from-source "$TAP_NAME/dol-chs" "$TAP_NAME/dol-chs-mod"
+          brew test "$TAP_NAME/dol-chs" "$TAP_NAME/dol-chs-mod"
