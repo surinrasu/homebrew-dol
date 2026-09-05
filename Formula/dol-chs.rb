@@ -30,8 +30,12 @@ class DolChs < Formula
     pkgshare.install "Degrees of Lewdity.html" => "index.html"
     pkgshare.install "CREDITS.md", "LICENSE", "README.md"
     (pkgshare/"VERSION").write version.to_s
-    (pkgshare/"mods").install resource("official-i18n").cached_download => "official-i18n.mod.zip"
-    (pkgshare/"mods").install resource("official-images").cached_download => "official-images.mod.zip"
+    resource("official-i18n").stage do
+      (pkgshare/"mods").install Dir["*"].first => "official-i18n.mod.zip"
+    end
+    resource("official-images").stage do
+      (pkgshare/"mods").install Dir["*"].first => "official-images.mod.zip"
+    end
 
     server = Pathname(__dir__).parent/"libexec/dol_http_server.py"
     installed_server = libexec/"dol_http_server.py"
