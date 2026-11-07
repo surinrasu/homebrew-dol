@@ -1,9 +1,9 @@
 class DolChsMod < Formula
   desc "Run Degrees of Lewdity with explicitly selected localization and mods"
   homepage "https://github.com/Eltirosto/Degrees-of-Lewdity-Chinese-Localization"
-  url "https://github.com/Eltirosto/Degrees-of-Lewdity-Chinese-Localization/releases/download/v0.5.11.9-chs-1.0.0a/DoL-ModLoader-0.5.11.9-v2.101.1.zip"
-  version "0.5.11.9-chs-1.0.0a"
-  sha256 "928a1940a8dc5198ffb1c600b6f39e8e9b52f46f27017d46040e7569157de7f6"
+  url "https://github.com/Eltirosto/Degrees-of-Lewdity-Chinese-Localization/releases/download/v0.5.12.13-chs-1.0.1a/DoL-ModLoader-0.5.12.13-v2.101.1.zip"
+  version "0.5.12.13-chs-1.0.1a"
+  sha256 "2d4636840220cd4ca8cd4c7a1104fb5483f207a44383b9d56cc77a6d2b033917"
   license all_of: ["CC-BY-NC-SA-4.0", "MIT"]
 
   livecheck do
@@ -15,15 +15,15 @@ class DolChsMod < Formula
   depends_on "python@3.14"
 
   resource "official-i18n" do
-    url "https://github.com/Eltirosto/Degrees-of-Lewdity-Chinese-Localization/releases/download/v0.5.11.9-chs-1.0.0a/ModI18N-0.5.11.9-chs-1.0.0a.mod.zip",
+    url "https://github.com/Eltirosto/Degrees-of-Lewdity-Chinese-Localization/releases/download/v0.5.12.13-chs-1.0.1a/ModI18N-0.5.12.13-chs-1.0.1a.mod.zip",
         using: :nounzip
-    sha256 "90439d4bbb917249d953ada643b512c34e95097cddd9765921ac6a030ebfd1fa"
+    sha256 "af3950ec751442dbf6af5dac42ae3cee0fea67fc1944a836ffc8c3a8e5407be3"
   end
 
   resource "official-images" do
-    url "https://github.com/Eltirosto/Degrees-of-Lewdity-Chinese-Localization/releases/download/v0.5.11.9-chs-1.0.0a/GameOriginalImagePack-0.5.11.9.mod.zip",
+    url "https://github.com/Eltirosto/Degrees-of-Lewdity-Chinese-Localization/releases/download/v0.5.12.13-chs-1.0.1a/GameOriginalImagePack-0.5.12.13.mod.zip",
         using: :nounzip
-    sha256 "23f2ed879ec7a476b6a42d015b955da7aa2d4d2ada62983701968e7c5625090c"
+    sha256 "2281b8784f034ab8eb027cdca77019b626fbc50905bc2b18229f5e40ef152076"
   end
 
   def install
